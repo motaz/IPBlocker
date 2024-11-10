@@ -1,6 +1,6 @@
 // IPBlocker project
 // Sept 2017
-// 29-June-2023 Updated
+// 10-Nov-2024 Updated
 // Motaz Abdel Azeem
 // Code for Computer Software www.code.sd
 
@@ -22,10 +22,12 @@ func main() {
 	country := flag.Bool("c", false, "Get country name")
 
 	flag.Parse()
+
+	fmt.Println(*limit)
 	limitNum := *limit
 	hackFile := *hack
 	getCountryName := *country
-	if len(flag.Args()) < 2 {
+	if *path == "" {
 		fmt.Println("IPBlocker, usage: ")
 		fmt.Println("./IPBlocker -f <web server access log file path> -l <visit count>")
 		fmt.Println("Example:\n./IPBlocker -f /var/log/nginx/access.log -l 12000")
