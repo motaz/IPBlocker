@@ -82,7 +82,7 @@ func addIP(ip string, ips *[]string) {
 	}
 }
 
-func checkIP(path string, result string, limitNum int, text string, getCountryName bool) {
+func checkIP(path string, result string, limitNum int, text string, getCountryName, asteriskLog bool) {
 
 	collection := ""
 	content, _ := os.ReadFile(path)
@@ -104,16 +104,32 @@ func checkIP(path string, result string, limitNum int, text string, getCountryNa
 	list := strings.Split(result, "\n")
 
 	for _, line := range list {
-		if strings.Contains(line, "-") {
-			ip := line[0:strings.Index(line, "-")]
-			ip = strings.Trim(ip, " ")
+		var ip string = ""
 
-			if !strings.Contains(collection, ip+",") {
-				collection = collection + ip + ", "
-				process(path, ip, limitNum, text, getCountryName, exceptIPs)
+		if asteriskLog {
+			if strings.Contains(line, "Registration from") && strings.Contains(line, "failed for") {
+
+				ip = line[strings.Index(line, "failed for"):]
+				ip = ip[strings.Index(ip, "'")+1 : strings.Index(ip, ":")]
+
+			} else if strings.Contains(line, "Call from") && strings.Contains(line, "rejected") &&
+
+				strings.Contains(line, "(") {
+				ip = line[strings.Index(line, "Call from"):]
+				ip = ip[strings.Index(ip, "(")+1 : strings.Index(ip, ":")]
+
 			}
+		} else if strings.Contains(line, "-") {
 
+			ip = line[0:strings.Index(line, "-")]
+			ip = strings.Trim(ip, " ")
 		}
+		if ip != "" && !strings.Contains(collection, ip+",") {
+
+			collection = collection + ip + ", "
+			process(path, ip, limitNum, text, getCountryName, exceptIPs)
+		}
+
 	}
 }
 
@@ -180,7 +196,7 @@ func block(ip string) (result string) {
 
 func getCount(path string, ip string, text string) int {
 
-	command := "cat " + path + " | grep '" + ip + " -'"
+	command := "cat " + path + " | grep '" + ip + "'"
 	if text != "" {
 		command += " | grep '" + text + "'"
 	}
@@ -213,7 +229,7 @@ func shell(command string) (result string, err string) {
 
 func ourPrint(atext string) {
 
-	println(atext)
+	fmt.Println(atext)
 	codeutils.WriteToLog(atext, "blocker")
 }
 
@@ -224,13 +240,13 @@ func isExceptionIP(ip string) bool {
 	content, err := ioutil.ReadFile(dir + "/exceptions.ini")
 	found := false
 	if err != nil {
-		println("Error in isExpectionIP: " + err.Error())
+		fmt.Println("Error in isExpectionIP: " + err.Error())
 	} else {
 		lines := strings.Split(string(content), "\n")
 		for _, exceptip := range lines {
 			if exceptip != "" {
 				if strings.HasPrefix(ip, exceptip) {
-					println("Skipped: " + ip + ", " + exceptip)
+					fmt.Println("Skipped: " + ip + ", " + exceptip)
 					found = true
 					break
 				}
@@ -256,7 +272,7 @@ func readHack(path string, result string, limitNum int, filename string) bool {
 		hack := strings.Split(string(content), "\n")
 		for _, text := range hack {
 			if text != "" {
-				checkIP(path, result, 1, text, true)
+				checkIP(path, result, 1, text, true, false)
 			}
 		}
 	}
