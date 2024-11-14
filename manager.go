@@ -22,6 +22,7 @@ var exceptionVisits []string
 type CountryInfo struct {
 	Success     bool   `json:"success"`
 	Countryname string `json:"countryname"`
+	CountryCode string `json:"countrycode2"`
 }
 
 func readExceptionVisits() {
@@ -51,7 +52,7 @@ func existInVisits(line string) (exist bool) {
 	return
 }
 
-func retreiveCountryName(ip string) (countryName string) {
+func retreiveCountryName(ip string) (countryName, CountryCode string) {
 
 	iplocationURL := codeutils.GetConfigValue("config.ini", "iplocationurl")
 	if iplocationURL == "" {
@@ -63,6 +64,7 @@ func retreiveCountryName(ip string) (countryName string) {
 		err := json.Unmarshal(res, &info)
 		if err == nil {
 			countryName = info.Countryname
+			CountryCode = info.CountryCode
 		}
 	}
 	return
@@ -82,7 +84,7 @@ func addIP(ip string, ips *[]string) {
 	}
 }
 
-func checkIP(path string, result string, limitNum int, text string, getCountryName, asteriskLog bool) {
+func checkIP(path string, result string, limitNum int, text string, getCountryName, asteriskLog, blockAny bool) {
 
 	collection := ""
 	content, _ := os.ReadFile(path)
@@ -127,7 +129,7 @@ func checkIP(path string, result string, limitNum int, text string, getCountryNa
 		if ip != "" && !strings.Contains(collection, ip+",") {
 
 			collection = collection + ip + ", "
-			process(path, ip, limitNum, text, getCountryName, exceptIPs)
+			process(path, ip, limitNum, text, getCountryName, blockAny, exceptIPs)
 		}
 
 	}
@@ -145,19 +147,52 @@ func searchSlice(slice []string, text string) (found bool) {
 	return
 }
 
-func process(path string, ip string, limitNum int, text string, getCountryName bool, exceptIPs []string) {
+func checkExceptionCountry(countryCode string) (Block bool) {
+
+	Block = true
+	lines, err := readLines("countries.ini")
+
+	if err == nil {
+		if len(lines) > 0 {
+			line := lines[0]
+			codes := strings.Split(line, ",")
+			for _, cc := range codes {
+				if cc == countryCode {
+					Block = false
+					break
+				}
+			}
+		}
+	} else {
+		fmt.Println(err.Error())
+	}
+	return
+}
+
+func process(path string, ip string, limitNum int, text string, getCountryName, blockAny bool, exceptIPs []string) {
 
 	count := getCount(path, ip, text)
 	data := " " + ip + " count (" + strconv.Itoa(count) + ") "
+	var countryName, countryCode string
+	if getCountryName {
+		countryName, countryCode = retreiveCountryName(ip)
+
+	}
 
 	found := searchSlice(exceptIPs, ip)
 	if (strings.HasPrefix(ip, "127.0")) || (ip == "::1") || (found) {
 		data = data + "Skipping"
 	} else {
-
-		if count >= limitNum {
-			data = data + "Exceeding limit "
-
+		var blockAnyRequest bool = false
+		if blockAny {
+			blockAnyRequest = checkExceptionCountry(countryCode)
+		}
+		if count >= limitNum || blockAnyRequest {
+			if blockAnyRequest {
+				data = data + " Block any request from " + countryName + " "
+			} else {
+				data = data + "Exceeding limit "
+			}
 			exception := isExceptionIP(ip)
 			if exception {
 				data = data + " Exception"
@@ -168,11 +203,7 @@ func process(path string, ip string, limitNum int, text string, getCountryName b
 			}
 		}
 	}
-	line := data + " " + text
-	if getCountryName {
-		countryName := retreiveCountryName(ip)
-		line += " " + countryName
-	}
+	line := data + " " + text + " " + countryName + " (" + countryCode + ")"
 
 	ourPrint(line)
 
@@ -272,7 +303,7 @@ func readHack(path string, result string, limitNum int, filename string) bool {
 		hack := strings.Split(string(content), "\n")
 		for _, text := range hack {
 			if text != "" {
-				checkIP(path, result, 1, text, true, false)
+				checkIP(path, result, 1, text, true, false, false)
 			}
 		}
 	}
