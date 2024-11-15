@@ -121,7 +121,7 @@ func checkIP(path string, result string, limitNum int, text string, getCountryNa
 				ip = ip[strings.Index(ip, "(")+1 : strings.Index(ip, ":")]
 
 			}
-		} else if strings.Contains(line, "-") {
+		} else if strings.Contains(line, "-") && !strings.Contains(line, "\" 200 ") {
 
 			ip = line[0:strings.Index(line, "-")]
 			ip = strings.Trim(ip, " ")
@@ -234,7 +234,8 @@ func getCount(path string, ip string, text string, asterisk bool) int {
 	if asterisk {
 		command += " | grep 'failed\\|rejected' "
 	} else {
-		command += " | grep -v '\" 200 ' "
+
+		command += " | grep '\" 400 \\|\" 401 \\|\" 404 ' "
 	}
 	command += " | wc -l"
 	result, er := shell(command)
