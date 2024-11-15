@@ -129,7 +129,7 @@ func checkIP(path string, result string, limitNum int, text string, getCountryNa
 		if ip != "" && !strings.Contains(collection, ip+",") {
 
 			collection = collection + ip + ", "
-			process(path, ip, limitNum, text, getCountryName, blockAny, exceptIPs)
+			process(path, ip, limitNum, text, getCountryName, asteriskLog, blockAny, exceptIPs)
 		}
 
 	}
@@ -169,9 +169,9 @@ func checkExceptionCountry(countryCode string) (Block bool) {
 	return
 }
 
-func process(path string, ip string, limitNum int, text string, getCountryName, blockAny bool, exceptIPs []string) {
+func process(path string, ip string, limitNum int, text string, getCountryName, asterisk, blockAny bool, exceptIPs []string) {
 
-	count := getCount(path, ip, text)
+	count := getCount(path, ip, text, asterisk)
 	data := " " + ip + " count (" + strconv.Itoa(count) + ") "
 	var countryName, countryCode string
 	if getCountryName {
@@ -189,7 +189,7 @@ func process(path string, ip string, limitNum int, text string, getCountryName, 
 		}
 		if count >= limitNum || blockAnyRequest {
 			if blockAnyRequest {
-				data = data + " Block any request from " + countryName + " "
+				data = data + " Block any request from " + ip + " "
 			} else {
 				data = data + "Exceeding limit "
 			}
@@ -198,7 +198,7 @@ func process(path string, ip string, limitNum int, text string, getCountryName, 
 				data = data + " Exception"
 
 			} else {
-				result := block(ip)
+				result := block(ip, count)
 				data += result
 			}
 		}
@@ -209,27 +209,32 @@ func process(path string, ip string, limitNum int, text string, getCountryName, 
 
 }
 
-func block(ip string) (result string) {
+func block(ip string, count int) (result string) {
 
-	if checkBlocked(ip) {
+	if checkBlocked(ip, count) {
 		result = "Already blocked"
 	} else {
 		_, er := shell("/sbin/iptables -I INPUT -s " + ip + " -j DROP")
 		if er != "" {
 			result = "Error while blocking: " + er
 		} else {
-			result = "Blocked"
-			writeBlockedIP(ip)
+			result = "------ Blocked -----"
+			writeBlockedIP(ip, count)
 		}
 	}
 	return
 }
 
-func getCount(path string, ip string, text string) int {
+func getCount(path string, ip string, text string, asterisk bool) int {
 
-	command := "cat " + path + " | grep '" + ip + "'"
+	command := "cat " + path + " | grep '" + ip + "' "
 	if text != "" {
-		command += " | grep '" + text + "'"
+		command += " | grep '" + text + "' "
+	}
+	if asterisk {
+		command += " | grep 'failed\\|rejected' "
+	} else {
+		command += " | grep -v '\" 200 ' "
 	}
 	command += " | wc -l"
 	result, er := shell(command)
@@ -311,9 +316,9 @@ func readHack(path string, result string, limitNum int, filename string) bool {
 	return found
 }
 
-func writeBlockedIP(ip string) {
+func writeBlockedIP(ip string, count int) {
 
-	redisaccess.SetValue("blocked-"+ip, "", time.Hour*10)
+	redisaccess.SetValue("blocked-"+ip, count, time.Hour*24)
 
 }
 
@@ -344,10 +349,20 @@ func readLines(filename string) (lines []string, err error) {
 	return
 }
 
-func checkBlocked(ip string) (found bool) {
-	_, found, err := redisaccess.GetValue("blocked-" + ip)
+func checkBlocked(ip string, count int) (found bool) {
+
+	value, found, err := redisaccess.GetValue("blocked-" + ip)
 	if err != nil {
 		found = false
+	}
+	if found {
+		if value != "" {
+			lastCount, err := strconv.Atoi(value)
+			if err == nil && lastCount < count {
+				fmt.Println("Previous count: ", lastCount, "  is less than current: ", count)
+				found = false
+			}
+		}
 	}
 	return
 }
