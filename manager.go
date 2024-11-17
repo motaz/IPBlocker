@@ -84,6 +84,13 @@ func addIP(ip string, ips *[]string) {
 	}
 }
 
+func hasFailedResponse(line string) (success bool) {
+
+	success = !strings.Contains(line, "\" 200 ") &&
+		!strings.Contains(line, "\" 301 ") && !strings.Contains(line, "\" 307")
+	return
+}
+
 func checkIP(path string, result string, limitNum int, text string, getCountryName, asteriskLog, blockAny bool) {
 
 	collection := ""
@@ -91,7 +98,7 @@ func checkIP(path string, result string, limitNum int, text string, getCountryNa
 	alllines := strings.Split(string(content), "\n")
 	exceptIPs, _ := readLines("visitips.txt")
 	for _, line := range alllines {
-		if strings.Contains(line, "-") {
+		if strings.Contains(line, "-") && hasFailedResponse(line) {
 
 			visitException := existInVisits(line)
 			ip := line[0:strings.Index(line, "-")]
@@ -121,7 +128,7 @@ func checkIP(path string, result string, limitNum int, text string, getCountryNa
 				ip = ip[strings.Index(ip, "(")+1 : strings.Index(ip, ":")]
 
 			}
-		} else if strings.Contains(line, "-") && !strings.Contains(line, "\" 200 ") {
+		} else if strings.Contains(line, "-") && hasFailedResponse(line) {
 
 			ip = line[0:strings.Index(line, "-")]
 			ip = strings.Trim(ip, " ")
@@ -169,7 +176,8 @@ func checkExceptionCountry(countryCode string) (Block bool) {
 	return
 }
 
-func process(path string, ip string, limitNum int, text string, getCountryName, asterisk, blockAny bool, exceptIPs []string) {
+func process(path string, ip string, limitNum int, text string, getCountryName, asterisk,
+	blockAny bool, exceptIPs []string) {
 
 	count := getCount(path, ip, text, asterisk)
 	data := " " + ip + " count (" + strconv.Itoa(count) + ") "
