@@ -21,7 +21,7 @@ func main() {
 	hack := flag.String("h", "", "Hacking text file source")
 	country := flag.Bool("c", false, "Get country name")
 	asterisk := flag.Bool("a", false, "Asterisk log")
-	blockany := flag.Bool("ba", false, "Block Any request except for contries.ini")
+	exceptCountries := flag.Bool("ec", false, "Exception Countries: Not block from contries.ini")
 
 	flag.Parse()
 
@@ -30,7 +30,10 @@ func main() {
 	hackFile := *hack
 	asteriskLog := *asterisk
 	getCountryName := *country
-	blockAny := *blockany
+	exCountries := *exceptCountries
+	if exCountries {
+		getCountryName = true
+	}
 	if *path == "" {
 		fmt.Println("IPBlocker, usage: ")
 		fmt.Println("./IPBlocker -f <web server access log file path> -l <visit count>")
@@ -46,7 +49,7 @@ func main() {
 		} else if hackFile != "" {
 			readHack(*path, result, limitNum, hackFile)
 		} else {
-			checkIP(*path, result, limitNum, "", getCountryName, asteriskLog, blockAny)
+			checkIP(*path, result, limitNum, "", getCountryName, asteriskLog, exCountries)
 
 		}
 	}

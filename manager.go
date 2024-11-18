@@ -91,7 +91,7 @@ func hasFailedResponse(line string) (success bool) {
 	return
 }
 
-func checkIP(path string, result string, limitNum int, text string, getCountryName, asteriskLog, blockAny bool) {
+func checkIP(path string, result string, limitNum int, text string, getCountryName, asteriskLog, exCountries bool) {
 
 	collection := ""
 	content, _ := os.ReadFile(path)
@@ -136,7 +136,7 @@ func checkIP(path string, result string, limitNum int, text string, getCountryNa
 		if ip != "" && !strings.Contains(collection, ip+",") {
 
 			collection = collection + ip + ", "
-			process(path, ip, limitNum, text, getCountryName, asteriskLog, blockAny, exceptIPs)
+			process(path, ip, limitNum, text, getCountryName, asteriskLog, exCountries, exceptIPs)
 		}
 
 	}
@@ -154,9 +154,9 @@ func searchSlice(slice []string, text string) (found bool) {
 	return
 }
 
-func checkExceptionCountry(countryCode string) (Block bool) {
+func existInExceptionCountry(countryCode string) (exist bool) {
 
-	Block = true
+	exist = false
 	lines, err := readLines("countries.ini")
 
 	if err == nil {
@@ -165,7 +165,7 @@ func checkExceptionCountry(countryCode string) (Block bool) {
 			codes := strings.Split(line, ",")
 			for _, cc := range codes {
 				if cc == countryCode {
-					Block = false
+					exist = true
 					break
 				}
 			}
@@ -177,7 +177,7 @@ func checkExceptionCountry(countryCode string) (Block bool) {
 }
 
 func process(path string, ip string, limitNum int, text string, getCountryName, asterisk,
-	blockAny bool, exceptIPs []string) {
+	exCountries bool, exceptIPs []string) {
 
 	count := getCount(path, ip, text, asterisk)
 	data := " " + ip + " count (" + strconv.Itoa(count) + ") "
@@ -191,16 +191,14 @@ func process(path string, ip string, limitNum int, text string, getCountryName, 
 	if (strings.HasPrefix(ip, "127.0")) || (ip == "::1") || (found) {
 		data = data + "Skipping"
 	} else {
-		var blockAnyRequest bool = false
-		if blockAny {
-			blockAnyRequest = checkExceptionCountry(countryCode)
+		var dontBlock bool = false
+		if exCountries {
+			dontBlock = existInExceptionCountry(countryCode)
 		}
-		if count >= limitNum || blockAnyRequest {
-			if blockAnyRequest {
-				data = data + " Block any request from " + ip + " "
-			} else {
-				data = data + "Exceeding limit "
-			}
+		if count >= limitNum && !dontBlock {
+
+			data = data + "Exceeding limit "
+
 			exception := isExceptionIP(ip)
 			if exception {
 				data = data + " Exception"
@@ -208,6 +206,10 @@ func process(path string, ip string, limitNum int, text string, getCountryName, 
 			} else {
 				result := block(ip, count)
 				data += result
+			}
+		} else {
+			if dontBlock && count >= limitNum {
+				data += " Exception Country"
 			}
 		}
 	}
