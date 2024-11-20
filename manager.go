@@ -30,9 +30,8 @@ func readExceptionVisits() {
 	dir := codeutils.GetCurrentAppDir()
 
 	content, err := ioutil.ReadFile(dir + "/exvisits.ini")
-	if err != nil {
-		codeutils.WriteToLog("Error readExceptionVisits: "+err.Error(), "IPBlocker")
-	} else {
+	if err == nil {
+
 		exceptionVisits = strings.Split(string(content), "\n")
 
 	}
@@ -164,7 +163,7 @@ func existInExceptionCountry(countryCode string) (exist bool) {
 			line := lines[0]
 			codes := strings.Split(line, ",")
 			for _, cc := range codes {
-				if cc == countryCode {
+				if strings.TrimSpace(cc) == countryCode {
 					exist = true
 					break
 				}
